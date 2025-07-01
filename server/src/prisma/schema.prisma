@@ -1,0 +1,131 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  email       String   @unique
+  name        String
+  password    String
+  avatar      String?
+  location    Json?    // { lat, lng, address, city, state }
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relationships
+  preferences UserPreferences?
+  interactions EventInteraction[]
+  recommendations EventRecommendation[]
+  savedEvents SavedEvent[]
+
+  @@map("users")
+}
+
+model UserPreferences {
+  id                String   @id @default(cuid())
+  userId            String   @unique
+  interests         String[] // ["music", "food", "tech", etc.]
+  eventTypes        String[] // Event categories
+  timePreferences   String[] // ["weekday-morning", "weekend-evening", etc.]
+  maxDistance       Int      @default(15) // miles
+  priceRangeMin     Int      @default(0)
+  priceRangeMax     Int      @default(100)
+  socialPreferences String[] // ["solo", "small-group", etc.]
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  // Relationships
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+model Event {
+  id            String   @id @default(cuid())
+  externalId    String?  @unique // ID from external API
+  title         String
+  description   String
+  category      String
+  startTime     DateTime
+  endTime       DateTime?
+  location      Json     // { address, city, state, lat, lng }
+  price         Float    @default(0)
+  imageUrl      String?
+  organizer     String
+  attendeeCount Int      @default(0)
+  tags          String[]
+  source        String   // "eventbrite", "meetup", "manual"
+  sourceUrl     String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relationships
+  interactions EventInteraction[]
+  recommendations EventRecommendation[]
+  savedEvents SavedEvent[]
+
+  @@map("events")
+}
+
+model EventInteraction {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  type      InteractionType // VIEW, CLICK, SAVE, ATTEND, SHARE
+  metadata  Json?    // Additional context
+  createdAt DateTime @default(now())
+
+  // Relationships
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@map("event_interactions")
+}
+
+model EventRecommendation {
+  id         String   @id @default(cuid())
+  userId     String
+  eventId    String
+  score      Float    // 0.0 to 1.0
+  reasons    String[] // Why this was recommended
+  algorithm  String   // Which algorithm generated this
+  createdAt  DateTime @default(now())
+
+  // Relationships
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("event_recommendations")
+}
+
+model SavedEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  eventId   String
+  createdAt DateTime @default(now())
+
+  // Relationships
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, eventId])
+  @@map("saved_events")
+}
+
+enum InteractionType {
+  VIEW
+  CLICK
+  SAVE
+  ATTEND
+  SHARE
+  UNSAVE
+}
